@@ -13,11 +13,11 @@
       "backgroundColor": "#2B2200"
     },
     "android": {
+      "package": "com.sawitgrad.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2B2200"
       },
-      "package": "com.sawitgrad.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -37,6 +37,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5eb87ed0-eeb1-4c18-9f55-9064b8f54dd5"
+      }
     }
   }
 }
