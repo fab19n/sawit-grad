@@ -1,9 +1,39 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from '../context/AuthContext';
+
+// This component handles the redirect logic.
+// It watches the auth state and the current route segment,
+// and pushes to /login whenever the user is not authenticated.
+// It also pushes to / whenever an authenticated user tries
+// to navigate to /login — preventing the back button from
+// returning to the login screen after a successful login.
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, isLoading } = useAuth();
+  const segments = useSegments();
+  const router   = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return; // Wait until we've checked SecureStore
+
+    const inLoginScreen = segments[0] === 'login';
+
+    if (!isLoggedIn && !inLoginScreen) {
+      // User is not logged in — send them to login
+      router.replace('/login');
+    } else if (isLoggedIn && inLoginScreen) {
+      // User is already logged in — send them to home
+      router.replace('/');
+    }
+  }, [isLoggedIn, isLoading, segments]);
+
+  return <>{children}</>;
+}
 
 function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -71,6 +101,7 @@ function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="login"        options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="history/[id]" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="ticket/[id]"  options={{ href: null, headerShown: false }} />
     </Tabs>
@@ -81,7 +112,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" backgroundColor={COLORS.dark} />
-      <TabLayout />
+      <AuthProvider>
+        <AuthGuard>
+          <TabLayout />
+        </AuthGuard>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

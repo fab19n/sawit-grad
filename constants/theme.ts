@@ -20,3 +20,7 @@ export const MILL_NAME  = 'Sri Aman Palm Oil Mill Sdn Bhd';
 export const SNO_START  = 139333;
 export const SNO_KEY    = 'sg_sno_counter';
 export const DB_NAME    = 'sawitgrad.db';
+
+export const API_URL = __DEV__
+  ? 'http://192.168.0.216:5000'   // ← replace with your actual local IP
+  : 'https://sawit-grad-api.onrender.com';

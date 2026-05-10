@@ -33,7 +33,8 @@
           "photosPermission": "SawitGrad memerlukan akses kamera untuk gambar FFB.",
           "cameraPermission": "SawitGrad memerlukan akses kamera untuk gambar FFB."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

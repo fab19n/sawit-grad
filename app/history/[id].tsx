@@ -12,6 +12,7 @@ import { uploadSingle } from '../../services/upload';
 import { GradingRecord, GradingRow } from '../../types/grading';
 import SyncBadge from '../../components/SyncBadge';
 
+
 function fmt(v: any) { return (v === null || v === undefined || v === '') ? '—' : String(v); }
 function fmtD(d: string) {
   if (!d) return '—';
@@ -72,11 +73,15 @@ export default function HistoryDetailScreen() {
   async function handleRetry() {
     if (!rec) return;
     setRetry(true);
-    const ok = await uploadSingle(rec.id);
+    // Pass the full record object so uploadSingle has the data to send
+    const ok = await uploadSingle(rec);
     const updated = await getRecord(rec.id);
     setRec(updated);
     setRetry(false);
-    Alert.alert(ok ? 'Berjaya' : 'Gagal', ok ? 'Rekod berjaya dimuat naik.' : 'Muat naik gagal. Cuba lagi.');
+    Alert.alert(
+      ok ? 'Berjaya' : 'Gagal',
+      ok ? 'Rekod berjaya dimuat naik.' : 'Muat naik gagal. Cuba lagi.'
+    );
   }
 
   if (!rec) {

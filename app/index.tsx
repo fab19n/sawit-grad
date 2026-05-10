@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useRecords } from '../hooks/useRecords';
 import EntryCard from '../components/EntryCard';
 import SyncBadge from '../components/SyncBadge';
 import { useRefreshOnFocus } from '../hooks/useRefreshOnFocus';
+import { useAuth } from '../context/AuthContext';
 
 export default function HomeScreen() {
   const insets  = useSafeAreaInsets();
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const monthRecs = submitted.filter(r => r.date?.startsWith(month));
   const pending   = submitted.filter(r => r.syncStatus === 'pending' || r.syncStatus === 'failed');
   const recent    = submitted.slice(0, 3);
+  const { user, logout } = useAuth();
 
   return (
     <View style={s.screen}>
@@ -31,9 +33,22 @@ export default function HomeScreen() {
             <Text style={s.headerSub}>{MILL_NAME}</Text>
             <Text style={s.headerTitle}>Penggredan</Text>
           </View>
-          <View style={s.avatar}>
-            <Ionicons name="person-outline" size={20} color={COLORS.gold} />
-          </View>
+            <TouchableOpacity
+              style={s.avatar}
+              onPress={() => {
+                Alert.alert(
+                  'Log Keluar',
+                  `Log keluar sebagai ${user?.name}?`,
+                  [
+                    { text: 'Batal', style: 'cancel' },
+                    { text: 'Log Keluar', style: 'destructive', onPress: logout },
+                  ]
+                );
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-outline" size={20} color={COLORS.gold} />
+            </TouchableOpacity>
         </View>
         {pending.length > 0 && (
           <View style={s.syncBanner}>
