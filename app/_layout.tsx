@@ -101,7 +101,14 @@ function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="login"        options={{ href: null, headerShown: false }} />
+      <Tabs.Screen
+        name="login"
+        options={{
+          href:         null,
+          headerShown:  false,
+          tabBarStyle:  { display: 'none' },
+        }}
+      />
       <Tabs.Screen name="history/[id]" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="ticket/[id]"  options={{ href: null, headerShown: false }} />
     </Tabs>
