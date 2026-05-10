@@ -2,29 +2,47 @@ import * as SQLite from 'expo-sqlite';
 import { DB_NAME } from '../constants/theme';
 import { GradingRecord, SyncStatus } from '../types/grading';
 
-let _db: SQLite.SQLiteDatabase | null = null;
+// ─────────────────────────────────────────────────────────────────────────────
+// SINGLETON CONNECTION
+// The database is opened exactly once when this module is first imported.
+// All functions below reuse this single connection, which is the correct
+// pattern for SQLite — opening multiple connections causes Android JNI errors.
+// ─────────────────────────────────────────────────────────────────────────────
+const db = SQLite.openDatabaseSync(DB_NAME);
 
-async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync(DB_NAME);
-  await _db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS records (
-      id         TEXT PRIMARY KEY,
-      data       TEXT NOT NULL,
-      syncStatus TEXT NOT NULL DEFAULT 'pending',
-      isDraft    INTEGER NOT NULL DEFAULT 0,
-      createdAt  TEXT NOT NULL
-    );
-  `);
-  return _db;
+// ─────────────────────────────────────────────────────────────────────────────
+// INITIALISATION
+// We run this once at module load time. Using a promise so any caller that
+// awaits initPromise is guaranteed the table exists before querying.
+// ─────────────────────────────────────────────────────────────────────────────
+const initPromise: Promise<void> = db.runAsync(
+  `CREATE TABLE IF NOT EXISTS records (
+    id         TEXT PRIMARY KEY,
+    data       TEXT NOT NULL,
+    syncStatus TEXT NOT NULL DEFAULT 'pending',
+    isDraft    INTEGER NOT NULL DEFAULT 0,
+    createdAt  TEXT NOT NULL
+  )`
+).then(() => {
+  // Table is ready — nothing else needed
+}).catch(e => {
+  console.error('DB init error:', e);
+});
+
+// Every exported function awaits initPromise first.
+// After the first call this resolves instantly (Promise is already settled).
+async function ready(): Promise<void> {
+  await initPromise;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CRUD OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function saveRecord(record: GradingRecord): Promise<void> {
-  const db = await getDb();
+  await ready();
   await db.runAsync(
-    `INSERT OR REPLACE INTO records
-     (id, data, syncStatus, isDraft, createdAt)
+    `INSERT OR REPLACE INTO records (id, data, syncStatus, isDraft, createdAt)
      VALUES (?, ?, ?, ?, ?)`,
     [
       record.id,
@@ -37,7 +55,7 @@ export async function saveRecord(record: GradingRecord): Promise<void> {
 }
 
 export async function getAllRecords(): Promise<GradingRecord[]> {
-  const db = await getDb();
+  await ready();
   const rows = await db.getAllAsync<{ data: string }>(
     `SELECT data FROM records ORDER BY createdAt DESC`
   );
@@ -45,7 +63,7 @@ export async function getAllRecords(): Promise<GradingRecord[]> {
 }
 
 export async function getRecord(id: string): Promise<GradingRecord | null> {
-  const db = await getDb();
+  await ready();
   const row = await db.getFirstAsync<{ data: string }>(
     `SELECT data FROM records WHERE id = ?`,
     [id]
@@ -57,7 +75,8 @@ export async function updateSyncStatus(
   id: string,
   status: SyncStatus
 ): Promise<void> {
-  const db = await getDb();
+  await ready();
+  // Fetch the full record first so we can update the embedded JSON too
   const record = await getRecord(id);
   if (!record) return;
   record.syncStatus = status;
@@ -68,7 +87,7 @@ export async function updateSyncStatus(
 }
 
 export async function getPendingRecords(): Promise<GradingRecord[]> {
-  const db = await getDb();
+  await ready();
   const rows = await db.getAllAsync<{ data: string }>(
     `SELECT data FROM records
      WHERE syncStatus IN ('pending','failed') AND isDraft = 0
@@ -78,6 +97,6 @@ export async function getPendingRecords(): Promise<GradingRecord[]> {
 }
 
 export async function deleteRecord(id: string): Promise<void> {
-  const db = await getDb();
+  await ready();
   await db.runAsync(`DELETE FROM records WHERE id = ?`, [id]);
 }

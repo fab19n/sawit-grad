@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { useRecords } from '../hooks/useRecords';
 import { GradingRecord } from '../types/grading';
+import { useRefreshOnFocus } from '../hooks/useRefreshOnFocus';
 
 type Filter = 'all' | 'today' | 'week';
 
@@ -22,6 +23,8 @@ export default function TicketScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { records, loading, refresh } = useRecords();
+  useRefreshOnFocus(refresh);
+  
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 

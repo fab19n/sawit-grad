@@ -2,7 +2,7 @@ import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   TextInput, Alert, ActivityIndicator,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +13,8 @@ import { saveRecord } from '../services/db';
 import { peekNextSNO, claimSNO } from '../services/serial';
 import GradingTableRow from '../components/GradingTableRow';
 import Stepper from '../components/Stepper';
+import { useFocusEffect } from 'expo-router';
+
 
 const EMPTY_ROW: GradingRow = { bil: 0, pct: 0, penalti: 0 };
 
@@ -66,6 +68,37 @@ export default function FormScreen() {
 
   // Photos
   const [photos, setPhotos] = useState<(string|null)[]>([null, null, null]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setDate(todayStr());
+      setTime(nowTime());
+      setNamaLesen('');
+      setNoLesenMPOB('');
+      setNoKenderaan('');
+      setNoTiket(0);
+      setBilSampel(0);
+      setBeratBersih(0);
+      setPurataBerat(0);
+      setBoer(0);
+      setBker(0);
+      setTandanMasak({...EMPTY_ROW});
+      setTandanMengkal({...EMPTY_ROW});
+      setTandanBusuk({...EMPTY_ROW});
+      setTandanKosong({...EMPTY_ROW});
+      setTandanKotor({...EMPTY_ROW});
+      setTandanLama({...EMPTY_ROW});
+      setTandanDura({...EMPTY_ROW});
+      setTandanTangkai({...EMPTY_ROW});
+      setPartenokarpi({...EMPTY_ROW});
+      setGoer(0);
+      setCatatan('');
+      setNamaPenggred('');
+      setNamaPemandu('');
+      setPhotos([null, null, null]);
+      peekNextSNO().then(setSno);
+    }, [])
+  );
 
   useEffect(() => {
     peekNextSNO().then(setSno);

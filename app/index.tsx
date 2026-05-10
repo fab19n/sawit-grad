@@ -6,11 +6,13 @@ import { COLORS, MILL_NAME } from '../constants/theme';
 import { useRecords } from '../hooks/useRecords';
 import EntryCard from '../components/EntryCard';
 import SyncBadge from '../components/SyncBadge';
+import { useRefreshOnFocus } from '../hooks/useRefreshOnFocus';
 
 export default function HomeScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { records, loading, refresh } = useRecords();
+  useRefreshOnFocus(refresh);
 
   const today     = new Date().toISOString().split('T')[0];
   const month     = today.slice(0, 7);

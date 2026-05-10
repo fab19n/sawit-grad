@@ -12,6 +12,7 @@ import { useRecords } from '../hooks/useRecords';
 import { uploadAll, UploadProgress } from '../services/upload';
 import EntryCard from '../components/EntryCard';
 import { GradingRecord } from '../types/grading';
+import { useRefreshOnFocus } from '../hooks/useRefreshOnFocus';
 
 type Filter = 'all' | 'synced' | 'pending' | 'failed' | 'draft';
 
@@ -19,6 +20,7 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { records, loading, refresh } = useRecords();
+  useRefreshOnFocus(refresh);
 
   const [search,  setSearch]  = useState('');
   const [filter,  setFilter]  = useState<Filter>('all');
