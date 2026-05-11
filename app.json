@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "SawitGrad",
-    "slug": "sawitgrad",
+    "name": "SawitGrade",
+    "slug": "sawitgrade",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/sawit-grade-icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "sawitgrad",
+    "scheme": "sawitgrade",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/sawit-grade-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#2B2200"
     },
     "android": {
-      "package": "com.sawitgrad.app",
+      "package": "com.sawitgrade.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/sawit-grade-icon.png",
         "backgroundColor": "#2B2200"
       },
       "permissions": [
@@ -30,8 +30,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "SawitGrad memerlukan akses kamera untuk gambar FFB.",
-          "cameraPermission": "SawitGrad memerlukan akses kamera untuk gambar FFB."
+          "photosPermission": "SawitGrade memerlukan akses kamera untuk gambar FFB.",
+          "cameraPermission": "SawitGrade memerlukan akses kamera untuk gambar FFB."
         }
       ],
       "expo-secure-store"

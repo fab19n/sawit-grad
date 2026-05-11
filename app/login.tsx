@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, MILL_NAME } from '../constants/theme';
 import { login } from '../services/auth';
 import { useAuth } from '../context/AuthContext';
+import MyLogo from '../assets/sawit-grade-icon-2.svg';
 
 export default function LoginScreen() {
   const insets  = useSafeAreaInsets();
@@ -58,10 +59,8 @@ export default function LoginScreen() {
       >
         {/* Logo area */}
         <View style={s.logoWrap}>
-          <View style={s.logoCircle}>
-            <Ionicons name="leaf" size={40} color={COLORS.gold} />
-          </View>
-          <Text style={s.appName}>SawitGrad</Text>
+          <MyLogo width={110} height={110} />
+          <Text style={s.appName}>SawitGrade</Text>
           <Text style={s.millName}>{MILL_NAME}</Text>
         </View>
 
@@ -147,7 +146,7 @@ export default function LoginScreen() {
         </View>
 
         {/* Version tag */}
-        <Text style={s.version}>SawitGrad v1.0.0</Text>
+        <Text style={s.version}>SawitGrade v1.0.0</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
