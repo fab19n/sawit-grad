@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 export const COLORS = {
   dark:     '#2B2200',
   mid:      '#4A3A00',
@@ -21,6 +23,23 @@ export const SNO_START  = 139333;
 export const SNO_KEY    = 'sg_sno_counter';
 export const DB_NAME    = 'sawitgrad.db';
 
-export const API_URL = __DEV__
-  ? 'http://192.168.0.216:5000'   // ← replace with your actual local IP
-  : 'https://sawit-grad-api.onrender.com';
+// In development, dynamically read the Metro bundler host IP.
+// This is the same IP Expo uses to serve the JS bundle to your phone —
+// guaranteed to be the correct local network IP regardless of which
+// adapter or network you're on.
+// In production APK builds, __DEV__ is false so it always uses Render.
+function getApiUrl(): string {
+  if (!__DEV__) {
+    return 'https://your-render-url.onrender.com';
+  }
+  // Constants.expoConfig.hostUri gives "192.168.x.x:8081"
+  // We strip the port and replace with our API port 5000
+  const host = Constants.expoConfig?.hostUri?.split(':')[0];
+  if (host) {
+    return `http://${host}:5000`;
+  }
+  // Fallback if hostUri is unavailable
+  return 'http://localhost:5000';
+}
+
+export const API_URL = getApiUrl();

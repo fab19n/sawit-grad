@@ -23,7 +23,12 @@ export default function EntryCard({ record, onPress, showBadge = true }: Props) 
       <View style={s.top}>
         <View style={s.topLeft}>
           <Text style={s.sno}>#{record.id}</Text>
-          {showBadge && <SyncBadge status={status} />}
+          {showBadge && (
+            <SyncBadge
+              status={status}
+              isEdited={record.isEdited}
+            />
+          )}
         </View>
         <Text style={s.time}>{fmtDate(record.date)} · {record.time || '—'}</Text>
       </View>

@@ -34,7 +34,7 @@ export default function HomeScreen() {
             <Text style={s.headerTitle}>Penggredan</Text>
           </View>
             <TouchableOpacity
-              style={s.avatar}
+              style={s.logoutBtn}
               onPress={() => {
                 Alert.alert(
                   'Log Keluar',
@@ -47,7 +47,7 @@ export default function HomeScreen() {
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="person-outline" size={20} color={COLORS.gold} />
+              <Ionicons name="log-in-outline" size={20} color={COLORS.gold} />
             </TouchableOpacity>
         </View>
         {pending.length > 0 && (
@@ -125,7 +125,7 @@ const s = StyleSheet.create({
   headerRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   headerSub:     { color: 'rgba(240,217,106,0.55)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 },
   headerTitle:   { color: COLORS.gold, fontSize: 22, fontWeight: '700' },
-  avatar:        { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(240,217,106,0.1)', alignItems: 'center', justifyContent: 'center' },
+  logoutBtn:     { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(240,217,106,0.1)', alignItems: 'center', justifyContent: 'center' },
   syncBanner:    { marginTop: 14, padding: 10, backgroundColor: 'rgba(196,154,10,0.16)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(196,154,10,0.45)', flexDirection: 'row', alignItems: 'center', gap: 10 },
   syncBannerTxt: { color: COLORS.accent, fontSize: 13, fontWeight: '700' },
   scroll:        { flex: 1 },

@@ -3,18 +3,16 @@ import {
   TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, MILL_NAME } from '../constants/theme';
 import { GradingRecord, GradingRow } from '../types/grading';
-import { saveRecord } from '../services/db';
+import { saveRecord, getRecord } from '../services/db';
 import { peekNextSNO, claimSNO } from '../services/serial';
 import GradingTableRow from '../components/GradingTableRow';
 import Stepper from '../components/Stepper';
-import { useFocusEffect } from 'expo-router';
-
 
 const EMPTY_ROW: GradingRow = { bil: 0, pct: 0, penalti: 0 };
 
@@ -25,16 +23,20 @@ function nowTime()  {
 }
 
 export default function FormScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const insets  = useSafeAreaInsets();
+  const router  = useRouter();
+
+  // editId is present when navigating from history detail Edit button
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const isEditMode  = !!editId;
+
   const [sno,     setSno]     = useState('...');
   const [saving,  setSaving]  = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
 
-  // Header fields
   const [date,    setDate]    = useState(todayStr());
   const [time,    setTime]    = useState(nowTime());
 
-  // Supplier
   const [namaLesen,      setNamaLesen]      = useState('');
   const [noLesenMPOB,    setNoLesenMPOB]    = useState('');
   const [noKenderaan,    setNoKenderaan]    = useState('');
@@ -42,37 +44,73 @@ export default function FormScreen() {
   const [bilSampel,      setBilSampel]      = useState(0);
   const [beratBersih,    setBeratBersih]    = useState(0);
 
-  // Penetapan
   const [purataBerat,    setPurataBerat]    = useState(0);
   const [boer,           setBoer]           = useState(0);
   const [bker,           setBker]           = useState(0);
 
-  // Section A
-  const [tandanMasak,   setTandanMasak]    = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanMengkal, setTandanMengkal]  = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanBusuk,   setTandanBusuk]    = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanKosong,  setTandanKosong]   = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanMasak,    setTandanMasak]    = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanMengkal,  setTandanMengkal]  = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanBusuk,    setTandanBusuk]    = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanKosong,   setTandanKosong]   = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanKotor,    setTandanKotor]    = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanLama,     setTandanLama]     = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanDura,     setTandanDura]     = useState<GradingRow>({...EMPTY_ROW});
+  const [tandanTangkai,  setTandanTangkai]  = useState<GradingRow>({...EMPTY_ROW});
+  const [partenokarpi,   setPartenokarpi]   = useState<GradingRow>({...EMPTY_ROW});
 
-  // Section B
-  const [tandanKotor,   setTandanKotor]    = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanLama,    setTandanLama]     = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanDura,    setTandanDura]     = useState<GradingRow>({...EMPTY_ROW});
-  const [tandanTangkai, setTandanTangkai]  = useState<GradingRow>({...EMPTY_ROW});
-  const [partenokarpi,  setPartenokarpi]   = useState<GradingRow>({...EMPTY_ROW});
-
-  // Totals (computed)
   const [goer,          setGoer]           = useState(0);
   const [catatan,       setCatatan]        = useState('');
   const [namaPenggred,  setNamaPenggred]   = useState('');
   const [namaPemandu,   setNamaPemandu]    = useState('');
+  const [photos,        setPhotos]         = useState<(string|null)[]>([null, null, null]);
 
-  // Photos
-  const [photos, setPhotos] = useState<(string|null)[]>([null, null, null]);
+  // ── Populate form when editing an existing record ──────────────────────
+  useEffect(() => {
+    if (!isEditMode || !editId) {
+      peekNextSNO().then(setSno);
+      return;
+    }
+    setLoading(true);
+    getRecord(editId).then(rec => {
+      if (!rec) { Alert.alert('Ralat', 'Rekod tidak dijumpai.'); router.back(); return; }
+      setSno(rec.id);
+      setDate(rec.date);
+      setTime(rec.time);
+      setNamaLesen(rec.namaLesen);
+      setNoLesenMPOB(rec.noLesenMPOB || '');
+      setNoKenderaan(rec.noKenderaan);
+      setNoTiket(rec.noTiketTimbang || 0);
+      setBilSampel(rec.bilanganSampel || 0);
+      setBeratBersih(rec.beratBersih || 0);
+      setPurataBerat(rec.purataBerat || 0);
+      setBoer(rec.boer || 0);
+      setBker(rec.bker || 0);
+      setTandanMasak(rec.tandanMasak   || {...EMPTY_ROW});
+      setTandanMengkal(rec.tandanMengkal || {...EMPTY_ROW});
+      setTandanBusuk(rec.tandanBusuk   || {...EMPTY_ROW});
+      setTandanKosong(rec.tandanKosong  || {...EMPTY_ROW});
+      setTandanKotor(rec.tandanKotor   || {...EMPTY_ROW});
+      setTandanLama(rec.tandanLama     || {...EMPTY_ROW});
+      setTandanDura(rec.tandanDura     || {...EMPTY_ROW});
+      setTandanTangkai(rec.tandanTangkai || {...EMPTY_ROW});
+      setPartenokarpi(rec.partenokarpi  || {...EMPTY_ROW});
+      setGoer(rec.goer || 0);
+      setCatatan(rec.catatan || '');
+      setNamaPenggred(rec.namaPenggred || '');
+      setNamaPemandu(rec.namaPemandu || '');
+      setPhotos(rec.photos || [null, null, null]);
+      setLoading(false);
+    });
+  }, [editId]);
 
+  // ── Reset form only when NOT in edit mode ──────────────────────────────
   useFocusEffect(
     useCallback(() => {
-      setDate(todayStr());
-      setTime(nowTime());
+      if (isEditMode) return;
+      // date and time are intentionally NOT reset here.
+      // For new forms: useState initialises them correctly on mount.
+      // For edit forms: useEffect loads them from the record.
+      // Resetting here would overwrite the loaded record values.
       setNamaLesen('');
       setNoLesenMPOB('');
       setNoKenderaan('');
@@ -97,14 +135,10 @@ export default function FormScreen() {
       setNamaPemandu('');
       setPhotos([null, null, null]);
       peekNextSNO().then(setSno);
-    }, [])
+    }, [isEditMode])
   );
 
-  useEffect(() => {
-    peekNextSNO().then(setSno);
-  }, []);
-
-  // Live totals
+  // ── Computed totals ────────────────────────────────────────────────────
   const jumlahB: GradingRow = {
     bil:     tandanMasak.bil + tandanMengkal.bil + tandanBusuk.bil + tandanKosong.bil,
     pct:     tandanMasak.pct + tandanMengkal.pct + tandanBusuk.pct + tandanKosong.pct,
@@ -121,6 +155,7 @@ export default function FormScreen() {
     penalti: jumlahB.penalti + jumlahC.penalti,
   };
 
+  // ── Photo picker ───────────────────────────────────────────────────────
   async function pickPhoto(slot: number) {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -130,10 +165,7 @@ export default function FormScreen() {
     Alert.alert('Pilih Sumber', 'Ambil gambar dari:', [
       {
         text: 'Kamera', onPress: async () => {
-          const res = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.6, base64: true,
-          });
+          const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, base64: true });
           if (!res.canceled && res.assets[0].base64) {
             const updated = [...photos];
             updated[slot] = 'data:image/jpeg;base64,' + res.assets[0].base64;
@@ -143,10 +175,7 @@ export default function FormScreen() {
       },
       {
         text: 'Galeri', onPress: async () => {
-          const res = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.6, base64: true,
-          });
+          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, base64: true });
           if (!res.canceled && res.assets[0].base64) {
             const updated = [...photos];
             updated[slot] = 'data:image/jpeg;base64,' + res.assets[0].base64;
@@ -159,28 +188,39 @@ export default function FormScreen() {
   }
 
   function removePhoto(slot: number) {
-    const updated = [...photos];
-    updated[slot] = null;
-    setPhotos(updated);
+    const updated = [...photos]; updated[slot] = null; setPhotos(updated);
   }
 
   function validate(): boolean {
-    if (!namaLesen.trim()) {
-      Alert.alert('Medan diperlukan', 'Sila isi Nama Pembekal.');
-      return false;
-    }
-    if (!noKenderaan.trim()) {
-      Alert.alert('Medan diperlukan', 'Sila isi No. Kenderaan.');
-      return false;
-    }
+    if (!namaLesen.trim()) { Alert.alert('Medan diperlukan', 'Sila isi Nama Pembekal.'); return false; }
+    if (!noKenderaan.trim()) { Alert.alert('Medan diperlukan', 'Sila isi No. Kenderaan.'); return false; }
     return true;
   }
 
   async function buildRecord(isDraft: boolean): Promise<GradingRecord> {
-    const id = isDraft ? await peekNextSNO() : await claimSNO();
+    // In edit mode: keep the original ID and mark as edited
+    // In new mode: claim a new serial number
+    let id: string;
+    let existingRecord: GradingRecord | null = null;
+
+    if (isEditMode && editId) {
+      id = editId;
+      existingRecord = await getRecord(editId);
+    } else {
+      id = isDraft ? await peekNextSNO() : await claimSNO();
+    }
+
     return {
-      id, isDraft, syncStatus: 'pending',
-      createdAt: new Date().toISOString(),
+      id,
+      isDraft,
+      syncStatus: 'pending', // always re-queues for sync
+      createdAt: existingRecord?.createdAt || new Date().toISOString(),
+
+      // Edit tracking
+      isEdited:  isEditMode ? true : (existingRecord?.isEdited ?? false),
+      editCount: isEditMode ? ((existingRecord?.editCount ?? 0) + 1) : 0,
+      editedAt:  isEditMode ? new Date().toISOString() : null,
+
       date, time,
       namaLesen, noLesenMPOB, noKenderaan,
       noTiketTimbang: noTiket,
@@ -194,6 +234,24 @@ export default function FormScreen() {
       goer, catatan, namaPenggred, namaPemandu,
       photos,
     };
+  }
+
+  async function handleSubmit() {
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      const rec = await buildRecord(false);
+      await saveRecord(rec);
+      if (isEditMode) {
+        router.replace(`/history/${rec.id}`);
+      } else {
+        router.push(`/history/${rec.id}`);
+      }
+    } catch (e) {
+      Alert.alert('Ralat', 'Gagal menghantar borang.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDraft() {
@@ -210,27 +268,11 @@ export default function FormScreen() {
     }
   }
 
-  async function handleSubmit() {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      const rec = await buildRecord(false);
-      await saveRecord(rec);
-      router.push(`/history/${rec.id}`);
-    } catch (e) {
-      Alert.alert('Ralat', 'Gagal menghantar borang.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ── UI helpers ──
   const SectionBar = ({ title, lite }: { title: string; lite?: boolean }) => (
     <View style={[s.secBar, lite && s.secBarLite]}>
       <Text style={s.secBarTxt}>{title}</Text>
     </View>
   );
-
   const TotRow = ({ label, row }: { label: string; row: GradingRow }) => (
     <View style={s.totRow}>
       <Text style={s.totLabel}>{label}</Text>
@@ -239,7 +281,6 @@ export default function FormScreen() {
       <Text style={s.totVal}>{row.penalti.toFixed(2)}</Text>
     </View>
   );
-
   const GrandRow = ({ label, row }: { label: string; row: GradingRow }) => (
     <View style={s.grandRow}>
       <Text style={s.grandLabel}>{label}</Text>
@@ -249,15 +290,31 @@ export default function FormScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.warm }}>
+        <ActivityIndicator color={COLORS.accent} size="large" />
+      </View>
+    );
+  }
+
   return (
     <View style={s.screen}>
-      {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <View style={s.headerRow}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={20} color={COLORS.gold} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>Borang Penggredan Baru</Text>
+          <View>
+            <Text style={s.headerTitle}>
+              {isEditMode ? 'Edit Borang' : 'Borang Penggredan Baru'}
+            </Text>
+            {isEditMode && (
+              <Text style={s.editNotice}>
+                Mengedit rekod — akan dihantar semula untuk sync
+              </Text>
+            )}
+          </View>
         </View>
         <View style={s.snoBadge}>
           <Text style={s.snoLabel}>S/NO</Text>
@@ -271,56 +328,42 @@ export default function FormScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Mill banner */}
         <View style={s.millBanner}>
           <Text style={s.millName}>{MILL_NAME}</Text>
           <Text style={s.millForm}>BORANG PENGGREDAN</Text>
         </View>
 
-        {/* Date / Time */}
+        {/* Date / Time — read only display */}
         <View style={s.dtRow}>
           <View style={s.dtCell}>
             <Text style={s.fLabel}>Tarikh</Text>
-            <TextInput
-              style={s.dtInput}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={COLORS.accent}
-            />
+            <View style={s.dtDisplay}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.accent} style={{ marginRight: 8 }} />
+              <Text style={s.dtText}>{date}</Text>
+            </View>
           </View>
           <View style={s.dtCell}>
             <Text style={s.fLabel}>Masa</Text>
-            <TextInput
-              style={s.dtInput}
-              value={time}
-              onChangeText={setTime}
-              placeholder="HH:MM"
-              placeholderTextColor={COLORS.accent}
-            />
+            <View style={s.dtDisplay}>
+              <Ionicons name="time-outline" size={16} color={COLORS.accent} style={{ marginRight: 8 }} />
+              <Text style={s.dtText}>{time}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Supplier info */}
         <View style={s.fr}>
           <Text style={s.fLabel}>Nama Pembekal <Text style={s.req}>*</Text></Text>
-          <TextInput style={s.fi} value={namaLesen} onChangeText={setNamaLesen}
-            placeholder="e.g. B2A Greligan" placeholderTextColor={COLORS.accent} />
+          <TextInput style={s.fi} value={namaLesen} onChangeText={setNamaLesen} placeholder="e.g. B2A Greligan" placeholderTextColor={COLORS.accent} />
         </View>
-
         <View style={s.fr}>
           <Text style={s.fLabel}>No. Lesen MPOB</Text>
-          <TextInput style={s.fi} value={noLesenMPOB} onChangeText={setNoLesenMPOB}
-            placeholder="Nombor lesen MPOB" placeholderTextColor={COLORS.accent} />
+          <TextInput style={s.fi} value={noLesenMPOB} onChangeText={setNoLesenMPOB} placeholder="Nombor lesen MPOB" placeholderTextColor={COLORS.accent} />
         </View>
-
         <View style={s.fr}>
           <View style={s.g2}>
             <View style={s.g2cell}>
               <Text style={s.fLabel}>No. Kenderaan <Text style={s.req}>*</Text></Text>
-              <TextInput style={s.fi} value={noKenderaan} onChangeText={setNoKenderaan}
-                placeholder="VCL 7640" placeholderTextColor={COLORS.accent}
-                autoCapitalize="characters" />
+              <TextInput style={s.fi} value={noKenderaan} onChangeText={setNoKenderaan} placeholder="VCL 7640" placeholderTextColor={COLORS.accent} autoCapitalize="characters" />
             </View>
             <View style={s.g2cell}>
               <Text style={s.fLabel}>No. Tiket Timbang</Text>
@@ -328,7 +371,6 @@ export default function FormScreen() {
             </View>
           </View>
         </View>
-
         <View style={s.fr}>
           <View style={s.g2}>
             <View style={s.g2cell}>
@@ -342,7 +384,6 @@ export default function FormScreen() {
           </View>
         </View>
 
-        {/* Penetapan */}
         <SectionBar title="Penetapan Kadar Perahan Asas" />
         <View style={s.fr}>
           <Text style={s.fLabel}>i. Purata Berat Tandan (KG)</Text>
@@ -350,18 +391,11 @@ export default function FormScreen() {
         </View>
         <View style={s.fr}>
           <View style={s.g2}>
-            <View style={s.g2cell}>
-              <Text style={s.fLabel}>BOER (%)</Text>
-              <Stepper value={boer} onChange={setBoer} decimal small />
-            </View>
-            <View style={s.g2cell}>
-              <Text style={s.fLabel}>BKER (%)</Text>
-              <Stepper value={bker} onChange={setBker} decimal small />
-            </View>
+            <View style={s.g2cell}><Text style={s.fLabel}>BOER (%)</Text><Stepper value={boer} onChange={setBoer} decimal small /></View>
+            <View style={s.g2cell}><Text style={s.fLabel}>BKER (%)</Text><Stepper value={bker} onChange={setBker} decimal small /></View>
           </View>
         </View>
 
-        {/* Grading table header */}
         <SectionBar title="Penggredan" lite />
         <View style={s.gtHead}>
           <Text style={[s.gtHCol, { flex: 1.8 }]}>Penggredan</Text>
@@ -369,18 +403,12 @@ export default function FormScreen() {
           <Text style={[s.gtHCol, { flex: 1 }]}>%</Text>
           <Text style={[s.gtHCol, { flex: 1 }]}>Penalti</Text>
         </View>
-
-        {/* Section A */}
-        <View style={s.gtSubHd}>
-          <Text style={s.gtSubTxt}>Muatan Basah / Tandan Tidak Segar</Text>
-        </View>
+        <View style={s.gtSubHd}><Text style={s.gtSubTxt}>Muatan Basah / Tandan Tidak Segar</Text></View>
         <GradingTableRow label="(1) Tandan Masak"   value={tandanMasak}   onChange={setTandanMasak}   />
         <GradingTableRow label="(2) Tandan Mengkal"  value={tandanMengkal}  onChange={setTandanMengkal}  shaded />
         <GradingTableRow label="(3) Tandan Busuk"    value={tandanBusuk}    onChange={setTandanBusuk}    />
         <GradingTableRow label="(4) Tandan Kosong"   value={tandanKosong}   onChange={setTandanKosong}   shaded last />
         <TotRow label="JUMLAH (B)" row={jumlahB} />
-
-        {/* Section B */}
         <GradingTableRow label="(1) Tandan Kotor"    value={tandanKotor}    onChange={setTandanKotor}    />
         <GradingTableRow label="(2) Tandan Lama"     value={tandanLama}     onChange={setTandanLama}     shaded />
         <GradingTableRow label="(3) Tandan Dura"     value={tandanDura}     onChange={setTandanDura}     />
@@ -389,45 +417,23 @@ export default function FormScreen() {
         <TotRow label="JUMLAH (C)" row={jumlahC} />
         <GrandRow label="JUMLAH BESAR (A+B+C)" row={jumlahBesar} />
 
-        {/* GOER */}
         <View style={s.fr}>
           <Text style={s.fLabel}>Kadar Perahan Minyak Digred (GOER)</Text>
           <Stepper value={goer} onChange={setGoer} decimal />
         </View>
-
-        {/* Catatan */}
         <View style={s.fr}>
           <Text style={s.fLabel}>Catatan</Text>
-          <TextInput
-            style={s.ftxt}
-            value={catatan}
-            onChangeText={setCatatan}
-            placeholder="Nota atau ulasan..."
-            placeholderTextColor={COLORS.accent}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
+          <TextInput style={s.ftxt} value={catatan} onChangeText={setCatatan} placeholder="Nota atau ulasan..." placeholderTextColor={COLORS.accent} multiline numberOfLines={3} textAlignVertical="top" />
         </View>
 
-        {/* Signatures */}
         <SectionBar title="Tandatangan" />
         <View style={s.fr}>
           <View style={s.g2}>
-            <View style={s.g2cell}>
-              <Text style={s.fLabel}>Nama Penggred</Text>
-              <TextInput style={s.fi} value={namaPenggred} onChangeText={setNamaPenggred}
-                placeholder="Nama penggred" placeholderTextColor={COLORS.accent} />
-            </View>
-            <View style={s.g2cell}>
-              <Text style={s.fLabel}>Nama Pemandu/Pemilik</Text>
-              <TextInput style={s.fi} value={namaPemandu} onChangeText={setNamaPemandu}
-                placeholder="Nama pemandu" placeholderTextColor={COLORS.accent} />
-            </View>
+            <View style={s.g2cell}><Text style={s.fLabel}>Nama Penggred</Text><TextInput style={s.fi} value={namaPenggred} onChangeText={setNamaPenggred} placeholder="Nama penggred" placeholderTextColor={COLORS.accent} /></View>
+            <View style={s.g2cell}><Text style={s.fLabel}>Nama Pemandu/Pemilik</Text><TextInput style={s.fi} value={namaPemandu} onChangeText={setNamaPemandu} placeholder="Nama pemandu" placeholderTextColor={COLORS.accent} /></View>
           </View>
         </View>
 
-        {/* Photos */}
         <SectionBar title="Gambar FFB — Maksimum 3 Foto" />
         <View style={s.photoWrap}>
           {[0, 1, 2].map(i => (
@@ -435,7 +441,6 @@ export default function FormScreen() {
               {photos[i] ? (
                 <>
                   <TouchableOpacity onPress={() => pickPhoto(i)} activeOpacity={0.8}>
-                    {/* Show placeholder since we can't render base64 inline here easily */}
                     <View style={s.photoFilled}>
                       <Ionicons name="checkmark-circle" size={28} color={COLORS.synced} />
                       <Text style={s.photoFilledTxt}>Foto {i + 1}</Text>
@@ -455,19 +460,15 @@ export default function FormScreen() {
           ))}
         </View>
 
-        {/* Action buttons */}
         <View style={s.btnRow}>
+          {!isEditMode && (
+            <TouchableOpacity style={s.btnDraft} onPress={handleDraft} disabled={saving} activeOpacity={0.7}>
+              <Ionicons name="save-outline" size={20} color={COLORS.dark} />
+              <Text style={s.btnDraftTxt}>Simpan Draf</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={s.btnDraft}
-            onPress={handleDraft}
-            disabled={saving}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="save-outline" size={20} color={COLORS.dark} />
-            <Text style={s.btnDraftTxt}>Simpan Draf</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.btnSubmit}
+            style={[s.btnSubmit, isEditMode && { flex: 1 }]}
             onPress={handleSubmit}
             disabled={saving}
             activeOpacity={0.8}
@@ -475,8 +476,8 @@ export default function FormScreen() {
             {saving
               ? <ActivityIndicator color={COLORS.gold} />
               : <>
-                  <Ionicons name="send-outline" size={20} color={COLORS.gold} />
-                  <Text style={s.btnSubmitTxt}>Hantar</Text>
+                  <Ionicons name={isEditMode ? 'checkmark-outline' : 'send-outline'} size={20} color={COLORS.gold} />
+                  <Text style={s.btnSubmitTxt}>{isEditMode ? 'Simpan Perubahan' : 'Hantar'}</Text>
                 </>
             }
           </TouchableOpacity>
@@ -492,6 +493,7 @@ const s = StyleSheet.create({
   headerRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   backBtn:       { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(240,217,106,0.12)', alignItems: 'center', justifyContent: 'center' },
   headerTitle:   { color: COLORS.gold, fontSize: 16, fontWeight: '700' },
+  editNotice:    { color: 'rgba(240,217,106,0.55)', fontSize: 11, marginTop: 2 },
   snoBadge:      { backgroundColor: 'rgba(240,217,106,0.12)', borderWidth: 1.5, borderColor: 'rgba(196,154,10,0.5)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   snoLabel:      { color: 'rgba(240,217,106,0.6)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
   snoVal:        { color: COLORS.gold, fontSize: 24, fontWeight: '700', letterSpacing: 3, fontVariant: ['tabular-nums'] },
@@ -501,7 +503,8 @@ const s = StyleSheet.create({
   millForm:      { color: '#fff', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2.5 },
   dtRow:         { flexDirection: 'row', gap: 10, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1.5, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
   dtCell:        { flex: 1 },
-  dtInput:       { height: 42, fontSize: 15, fontWeight: '700', color: COLORS.dark, borderWidth: 2, borderColor: COLORS.accent, borderRadius: 7, paddingHorizontal: 10, backgroundColor: '#fff' },
+  dtDisplay:     { height: 42, flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: COLORS.border, borderRadius: 7, paddingHorizontal: 10, backgroundColor: '#F5EFD6' },
+  dtText:        { fontSize: 15, fontWeight: '700', color: COLORS.dark },
   fr:            { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1.5, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
   fLabel:        { fontSize: 11, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   req:           { color: '#C0392B' },
