@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SawitGrade",
-    "slug": "sawitgrade",
+    "name": "SawitGrad",
+    "slug": "sawitgrad",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/sawit-grade-icon.png",
