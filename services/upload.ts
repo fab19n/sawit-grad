@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { getPendingRecords, updateSyncStatus } from './db';
 import { getToken } from './auth';
 import { API_URL } from '../constants/theme';
@@ -10,12 +11,6 @@ export interface UploadProgress {
   supplier: string;
 }
 
-// The main sync function. It reads all pending records from SQLite,
-// sends them to the API in one batch request, then updates local
-// sync status based on what the server reports back.
-// We send them all in one request rather than one-by-one because
-// it's far more efficient on a mobile connection — one round trip
-// with a payload of 50 records is much faster than 50 round trips.
 export async function uploadAll(
   onProgress: (p: UploadProgress) => void,
   onDone:     (count: number) => void,
@@ -25,7 +20,6 @@ export async function uploadAll(
     const pending = await getPendingRecords();
     if (pending.length === 0) { onDone(0); return; }
 
-    // Show the user we're starting — set progress to first record immediately
     onProgress({
       current:  1,
       total:    pending.length,
@@ -33,33 +27,17 @@ export async function uploadAll(
       supplier: pending[0].namaLesen || '(Tanpa nama)',
     });
 
-    // Retrieve the stored JWT token. If there's no token, the user
-    // somehow got to this screen without being authenticated — send
-    // them back to login by returning an error.
     const token = await getToken();
-    if (!token) {
-      onError('Sesi tamat. Sila log masuk semula.');
-      return;
-    }
+    if (!token) { onError('Sesi tamat. Sila log masuk semula.'); return; }
 
-    // Send all pending records in a single batch request.
-    // The server's /api/records/sync endpoint accepts an array
-    // and processes each record individually, returning a count
-    // of how many succeeded and how many failed.
     const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), 30000); // 30s for batch upload
+    const timeoutId  = setTimeout(() => controller.abort(), 30000);
 
     const res = await fetch(`${API_URL}/api/records/sync`, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        // The Authorization header is how the server knows who is making
-        // this request. The protect middleware on the server extracts the
-        // token from this header, verifies it, and populates req.user.
-        'Authorization': `Bearer ${token}`,
-      },
-      body:   JSON.stringify({ records: pending }),
-      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ records: pending }),
+      signal:  controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -71,21 +49,16 @@ export async function uploadAll(
     }
 
     const data = await res.json();
+    if (!data.success) { onError(data.message || 'Muat naik gagal.'); return; }
 
-    if (!data.success) {
-      onError(data.message || 'Muat naik gagal.');
-      return;
-    }
-
-    // The server processed the records — now update each one locally.
-    // We update them one by one in SQLite because each record needs
-    // its own status update regardless of what happened to the others.
-    const synced = data.results?.synced ?? 0;
-    const failed = data.results?.failed ?? 0;
+    const synced    = data.results?.synced    ?? 0;
+    const failed    = data.results?.failed    ?? 0;
+    // The server returns a list of serialNos that collided with an existing
+    // record from a different device — these are flagged, not silently dropped.
+    const conflicts: string[] = data.results?.conflicts ?? [];
 
     for (let i = 0; i < pending.length; i++) {
       const record = pending[i];
-      // Update progress UI for each record as we process it locally
       onProgress({
         current:  i + 1,
         total:    pending.length,
@@ -93,15 +66,25 @@ export async function uploadAll(
         supplier: record.namaLesen || '(Tanpa nama)',
       });
 
-      // Mark as synced if the server reported overall success.
-      // In a more sophisticated implementation you'd track per-record
-      // success from the server response, but for now batch success
-      // means all records were processed.
-      await updateSyncStatus(record.id, failed === 0 ? 'synced' : 'failed');
+      if (conflicts.includes(record.id)) {
+        // Mark locally as 'conflict' so the badge shows amber in the history list
+        await updateSyncStatus(record.id, 'conflict');
+      } else {
+        await updateSyncStatus(record.id, failed === 0 ? 'synced' : 'failed');
+      }
+    }
+
+    // Alert the grader after the loop completes — one alert listing all conflicts,
+    // not one per record, to avoid a cascade of popups.
+    if (conflicts.length > 0) {
+      Alert.alert(
+        'Konflik Dikesan',
+        `No. Siri berikut telah wujud dalam sistem dari peranti lain:\n\n${conflicts.map(c => `• #${c}`).join('\n')}\n\nRekod anda telah disimpan dan akan disemak oleh pengurus.`,
+        [{ text: 'Faham', style: 'default' }]
+      );
     }
 
     onDone(synced);
-
   } catch (err: any) {
     if (err.name === 'AbortError') {
       onError('Sambungan tamat masa. Cuba lagi apabila rangkaian stabil.');
@@ -111,9 +94,6 @@ export async function uploadAll(
   }
 }
 
-// Single record retry — used from the History Detail screen's Retry button.
-// Sends just one record to the same sync endpoint wrapped in an array,
-// because the server endpoint always expects an array even for single records.
 export async function uploadSingle(record: GradingRecord): Promise<boolean> {
   try {
     const token = await getToken();
@@ -124,11 +104,7 @@ export async function uploadSingle(record: GradingRecord): Promise<boolean> {
 
     const res = await fetch(`${API_URL}/api/records/sync`, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      // Wrap in array — the endpoint always expects { records: [...] }
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body:    JSON.stringify({ records: [record] }),
       signal:  controller.signal,
     });
@@ -136,13 +112,29 @@ export async function uploadSingle(record: GradingRecord): Promise<boolean> {
     clearTimeout(timeoutId);
     const data = await res.json();
 
-    if (data.success && data.results?.synced > 0) {
-      await updateSyncStatus(record.id, 'synced');
-      return true;
-    } else {
+    if (!data.success) {
       await updateSyncStatus(record.id, 'failed');
       return false;
     }
+
+    const conflicts: string[] = data.results?.conflicts ?? [];
+    if (conflicts.includes(record.id)) {
+      await updateSyncStatus(record.id, 'conflict');
+      Alert.alert(
+        'Konflik Dikesan',
+        `No. Siri #${record.id} telah wujud dari peranti lain. Rekod anda telah disimpan dan akan disemak oleh pengurus.`,
+        [{ text: 'Faham' }]
+      );
+      return false; // Not a sync failure, but not cleanly synced either
+    }
+
+    if (data.results?.synced > 0) {
+      await updateSyncStatus(record.id, 'synced');
+      return true;
+    }
+
+    await updateSyncStatus(record.id, 'failed');
+    return false;
   } catch {
     await updateSyncStatus(record.id, 'failed');
     return false;

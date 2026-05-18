@@ -30,7 +30,7 @@ export const DB_NAME    = 'sawitgrad.db';
 // In production APK builds, __DEV__ is false so it always uses Render.
 function getApiUrl(): string {
   if (!__DEV__) {
-    return 'https://your-render-url.onrender.com';
+    return 'https://sawit-grad-api.onrender.com';
   }
   // Constants.expoConfig.hostUri gives "192.168.x.x:8081"
   // We strip the port and replace with our API port 5000

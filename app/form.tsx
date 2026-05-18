@@ -8,11 +8,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, MILL_NAME } from '../constants/theme';
-import { GradingRecord, GradingRow } from '../types/grading';
+import { GradingRecord, GradingRow, EditHistoryEntry } from '../types/grading';
 import { saveRecord, getRecord } from '../services/db';
 import { peekNextSNO, claimSNO } from '../services/serial';
 import GradingTableRow from '../components/GradingTableRow';
 import Stepper from '../components/Stepper';
+
+// Fields tracked per-edit (must match TRACKED_FIELDS in API recordController.ts)
+const TRACKED_FIELDS = [
+  'namaLesen', 'noLesenMPOB', 'noKenderaan', 'noTiketTimbang',
+  'bilanganSampel', 'beratBersih', 'purataBerat', 'boer', 'bker',
+  'tandanMasak', 'tandanMengkal', 'tandanBusuk', 'tandanKosong',
+  'tandanKotor', 'tandanLama', 'tandanDura', 'tandanTangkai',
+  'partenokarpi', 'goer', 'catatan', 'namaPenggred', 'namaPemandu',
+] as const;
 
 const EMPTY_ROW: GradingRow = { bil: 0, pct: 0, penalti: 0 };
 
@@ -210,6 +219,69 @@ export default function FormScreen() {
       id = isDraft ? await peekNextSNO() : await claimSNO();
     }
 
+    const newEditCount = isEditMode ? ((existingRecord?.editCount ?? 0) + 1) : 0;
+    const editedAtNow  = isEditMode ? new Date().toISOString() : null;
+
+    // ── Compute per-edit diff (only in edit mode) ──────────────────────────
+    // We snapshot only the fields that actually changed relative to the
+    // previously saved record.  This entry is stored in the local SQLite
+    // record and sent to the server on the next sync, giving one MongoDB
+    // editHistory entry per edit even when the user edits offline multiple
+    // times before a connection is available.
+    let editHistory: EditHistoryEntry[] = existingRecord?.editHistory ?? [];
+
+    if (isEditMode && existingRecord) {
+      // Map of fieldName → current form value for every tracked field
+      const formSnapshot: Record<string, any> = {
+        namaLesen,
+        noLesenMPOB,
+        noKenderaan,
+        noTiketTimbang: noTiket,
+        bilanganSampel:  bilSampel,
+        beratBersih,
+        purataBerat,
+        boer,
+        bker,
+        tandanMasak,
+        tandanMengkal,
+        tandanBusuk,
+        tandanKosong,
+        tandanKotor,
+        tandanLama,
+        tandanDura,
+        tandanTangkai,
+        partenokarpi,
+        goer,
+        catatan,
+        namaPenggred,
+        namaPemandu,
+      };
+
+      const oldValues: Record<string, any> = {};
+      const newValues: Record<string, any> = {};
+
+      for (const field of TRACKED_FIELDS) {
+        const oldVal = (existingRecord as any)[field];
+        const newVal = formSnapshot[field];
+        if (JSON.stringify(oldVal ?? null) !== JSON.stringify(newVal ?? null)) {
+          oldValues[field] = oldVal ?? null;
+          newValues[field] = newVal ?? null;
+        }
+      }
+
+      // Only append an entry if something actually changed
+      if (Object.keys(oldValues).length > 0) {
+        const entry: EditHistoryEntry = {
+          editedAt:  editedAtNow!,
+          editCount: newEditCount,
+          oldValues,
+          newValues,
+        };
+        editHistory = [...editHistory, entry];
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     return {
       id,
       isDraft,
@@ -217,9 +289,10 @@ export default function FormScreen() {
       createdAt: existingRecord?.createdAt || new Date().toISOString(),
 
       // Edit tracking
-      isEdited:  isEditMode ? true : (existingRecord?.isEdited ?? false),
-      editCount: isEditMode ? ((existingRecord?.editCount ?? 0) + 1) : 0,
-      editedAt:  isEditMode ? new Date().toISOString() : null,
+      isEdited:    isEditMode ? true : (existingRecord?.isEdited ?? false),
+      editCount:   newEditCount,
+      editedAt:    editedAtNow,
+      editHistory,
 
       date, time,
       namaLesen, noLesenMPOB, noKenderaan,

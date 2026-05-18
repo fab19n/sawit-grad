@@ -11,6 +11,8 @@ import { COLORS, MILL_NAME } from '../constants/theme';
 import { login } from '../services/auth';
 import { useAuth } from '../context/AuthContext';
 import MyLogo from '../assets/sawit-grade-icon-2.svg';
+import { seedFromServer } from '../services/seed';
+import { getToken } from '../services/auth';
 
 export default function LoginScreen() {
   const insets  = useSafeAreaInsets();
@@ -36,12 +38,21 @@ export default function LoginScreen() {
     const result = await login(email, password);
     setLoading(false);
 
-    if (result.success) {
-      // Navigate to home and replace the login screen in the stack
-      // so the user can't press back to return to the login page
-      await refreshAuth(); // Update auth context with new credentials
-      router.replace('/');
-    } else {
+  if (result.success) {
+    await refreshAuth(); // hydrates the AuthContext from SecureStore
+
+    // getToken() reads from SecureStore — the token is already there
+    // because login() called storeToken() before returning success.
+    // We do this instead of result.token because login() doesn't return it.
+    const freshToken = await getToken();
+    if (freshToken) {
+      // Fire-and-forget — seed failure must never block the grader from logging in.
+      // On success it populates SQLite with server records and bumps the SNO counter.
+      seedFromServer(freshToken).catch(() => {});
+    }
+
+    router.replace('/');
+  } else {
       setErrorMsg(result.message || 'Log masuk gagal.');
     }
     setLoading(false);
